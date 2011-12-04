@@ -19,3 +19,5 @@ V =
 # following line and set it to the full path to QEMU.
 #
 # QEMU=
+#QEMU=qemu -no-kvm
+QEMU=/opt/qemu/bin/qemu
