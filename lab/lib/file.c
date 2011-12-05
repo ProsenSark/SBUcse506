@@ -152,9 +152,12 @@ devfile_write(struct Fd *fd, const void *buf, size_t n)
 
 	assert(fd != NULL);
 	fsipcbuf.write.req_fileid = fd->fd_file.id;
+	//clog("wp1: %u", sizeof(fsipcbuf.write.req_buf));
+	if (n > sizeof(fsipcbuf.write.req_buf)) {
+		n = sizeof(fsipcbuf.write.req_buf);
+	}
 	fsipcbuf.write.req_n = n;
 
-	//clog("wp1: %u", sizeof(fsipcbuf.write.req_buf));
 	// NOTE: can NOT use 'str[n]cpy' functions here
 	memmove(fsipcbuf.write.req_buf, buf, fsipcbuf.write.req_n);
 	return fsipc(FSREQ_WRITE, NULL);
