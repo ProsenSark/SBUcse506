@@ -1,3 +1,6 @@
+#ifndef JOS_FS_FS_H
+#define JOS_FS_FS_H
+
 #include <inc/fs.h>
 #include <inc/lib.h>
 
@@ -11,8 +14,8 @@
 /* Maximum disk size we can handle (3GB) */
 #define DISKSIZE	0xC0000000
 
-struct Super *super;		// superblock
-uint32_t *bitmap;		// bitmap blocks mapped in memory
+extern struct Super *super;		// superblock
+extern uint32_t *bitmap;		// bitmap blocks mapped in memory
 
 /* ide.c */
 bool	ide_probe_disk1(void);
@@ -25,24 +28,30 @@ void*	diskaddr(uint32_t blockno);
 bool	va_is_mapped(void *va);
 bool	va_is_dirty(void *va);
 void	flush_block(void *addr);
+void	flush_sector(void *addr);
 void	bc_init(void);
 
 /* fs.c */
 void	fs_init(void);
 int	file_get_block(struct File *f, uint32_t file_blockno, char **pblk);
-int	file_create(const char *path, struct File **f);
+int	file_create(const char *path, struct File **f, uint32_t filetype,
+		bool crash);
 int	file_open(const char *path, struct File **f);
 ssize_t	file_read(struct File *f, void *buf, size_t count, off_t offset);
 int	file_write(struct File *f, const void *buf, size_t count, off_t offset);
 int	file_set_size(struct File *f, off_t newsize);
-void	file_flush(struct File *f);
-int	file_remove(const char *path);
+void	file_flush(struct File *f, bool crash);
+int	file_remove(const char *path, bool crash);
 void	fs_sync(void);
 
 /* int	map_block(uint32_t); */
 bool	block_is_free(uint32_t blockno);
-int	alloc_block(void);
+void	free_block(uint32_t blockno);
+void	occupy_block(uint32_t blockno);
+int		alloc_block(bool occupy);
 
 /* test.c */
 void	fs_test(void);
+
+#endif /* !JOS_FS_FS_H */
 

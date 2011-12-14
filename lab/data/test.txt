@@ -1,0 +1,89 @@
+
+$ mkdir test
+fs/fs.c:414: file_create: 1, test
+fs/fs.c:554: file_flush: sleeping for 3 secs BEFORE flush_block() of file blocks, hit Ctrl-a x to simulate a CRASH!
+fs/fs.c:568: file_flush: sleeping for 3 secs BEFORE flush_block() of File struct, hit Ctrl-a x to simulate a CRASH!
+fs/fs.c:577: file_flush: sleeping for 3 secs BEFORE flush_block() of file indirect block, hit Ctrl-a x to simulate a CRASH!
+fs/serv.c:443: serve_flush: 200b: 1, test, fd_ref = 2
+fs/fs.c:554: file_flush: sleeping for 3 secs BEFORE flush_block() of file blocks, hit Ctrl-a x to simulate a CRASH!
+QEMU: Terminated
+
+journal superblock is good
+fs/jbd.c:362: handle_replay: h_tid = 0, hno = 0, h_oper = JBD_CREAT
+fs/jbd.c:369: handle_replay: file_create failed: file already exists
+
+$ ls -l
+         37 - newmotd
+            .
+            .
+            .
+       4096 d foodir
+          6 - 1.txt
+          0 d test
+$
+
+=====================================
+
+$ echo shdshsdjjsddssd > 1.txt
+fs/fs.c:414: file_create: 0, 1.txt
+fs/fs.c:554: file_flush: sleeping for 3 secs BEFORE flush_block() of file blocks, hit Ctrl-a x to simulate a CRASH!
+fs/fs.c:568: file_flush: sleeping for 3 secs BEFORE flush_block() of File struct, hit Ctrl-a x to simulate a CRASH!
+fs/fs.c:577: file_flush: sleeping for 3 secs BEFORE flush_block() of file indirect block, hit Ctrl-a x to simulate a CRASH!
+fs/serv.c:443: serve_flush: 600a: 0, 1.txt, fd_ref = 3
+fs/fs.c:554: file_flush: sleeping for 3 secs BEFORE flush_block() of file blocks, hit Ctrl-a x to simulate a CRASH!
+fs/fs.c:568: file_flush: sleeping for 3 secs BEFORE flush_block() of File struct, hit Ctrl-a x to simulate a CRASH!
+fs/fs.c:577: file_flush: sleeping for 3 secs BEFORE flush_block() of file indirect block, hit Ctrl-a x to simulate a CRASH!
+fs/serv.c:443: serve_flush: 600a: 0, 1.txt, fd_ref = 3
+fs/fs.c:554: file_flush: sleeping for 3 secs BEFORE flush_block() of file blocks, hit Ctrl-a x to simulate a CRASH!
+fs/fs.c:568: file_flush: sleeping for 3 secs BEFORE flush_block() of File struct, hit Ctrl-a x to simulate a CRASH!
+fs/fs.c:577: file_flush: sleeping for 3 secs BEFORE flush_block() of file indirect block, hit Ctrl-a x to simulate a CRASH!
+fs/serv.c:443: serve_flush: 200b: 0, 1.txt, fd_ref = 2
+fs/fs.c:554: file_flush: sleeping for 3 secs BEFORE flush_block() of file blocks, hit Ctrl-a x to simulate a CRASH!
+QEMU: Terminated
+
+journal superblock is good
+fs/jbd.c:362: handle_replay: h_tid = 0, hno = 0, h_oper = JBD_WRITE
+
+$ cat 1.txt
+shdshsdjjsddssd
+$
+
+=====================================
+
+$ truncate -s 6 1.txt
+fs/serv.c:443: serve_flush: 300b: 0, 1.txt, fd_ref = 2
+fs/fs.c:554: file_flush: sleeping for 3 secs BEFORE flush_block() of file blocks, hit Ctrl-a x to simulate a CRASH!
+fs/fs.c:568: file_flush: sleeping for 3 secs BEFORE flush_block() of File struct, hit Ctrl-a x to simulate a CRASH!
+QEMU: Terminated
+
+journal superblock is good
+fs/jbd.c:362: handle_replay: h_tid = 0, hno = 0, h_oper = JBD_TRUNC
+
+$ cat 1.txt
+shdshs$
+
+=====================================
+
+$ rm test
+fs/fs.c:601: file_remove: sleeping for 3 secs BEFORE flush_block() of File struct, hit Ctrl-a x to simulate a CRASH!
+QEMU: Terminated
+
+journal superblock is good
+fs/jbd.c:362: handle_replay: h_tid = 0, hno = 0, h_oper = JBD_DELET
+
+$ ls -l test
+user/ls.c:17: ls: stat test: file or block not found
+$
+
+$ rm 1.txt
+fs/fs.c:601: file_remove: sleeping for 3 secs BEFORE flush_block() of File struct, hit Ctrl-a x to simulate a CRASH!
+QEMU: Terminated
+
+journal superblock is good
+fs/jbd.c:362: handle_replay: h_tid = 0, hno = 0, h_oper = JBD_DELET
+
+$ ls -l 1.txt
+user/ls.c:17: ls: stat 1.txt: file or block not found
+$
+
+

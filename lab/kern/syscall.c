@@ -202,6 +202,22 @@ sys_env_set_pgfault_upcall(envid_t envid, void *func)
 	return 0;
 }
 
+static int
+sys_env_set_transaction(envid_t envid, void *trans)
+{
+	struct Env *penv = NULL;
+	int rc;
+
+	rc = envid2env(envid, &penv, 0);
+	if (rc < 0) {
+		return rc;
+	}
+
+	assert(penv != NULL);
+	penv->env_trans = trans;
+	return 0;
+}
+
 // Allocate a page of memory and map it at 'va' with permission
 // 'perm' in the address space of 'envid'.
 // The page's contents are set to 0.
@@ -590,6 +606,9 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 					(struct Trapframe *) a2);
 		case SYS_env_set_pgfault_upcall:
 			return (int32_t) sys_env_set_pgfault_upcall((envid_t) a1,
+					(void *) a2);
+		case SYS_env_set_transaction:
+			return (int32_t) sys_env_set_transaction((envid_t) a1,
 					(void *) a2);
 		case SYS_yield:
 			sys_yield();

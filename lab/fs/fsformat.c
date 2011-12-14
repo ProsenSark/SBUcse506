@@ -30,6 +30,9 @@ typedef int bool;
 
 #include <inc/mmu.h>
 #include <inc/fs.h>
+#if defined(ENABLE_JBD)
+#include <fs/jbd.h>
+#endif
 
 #define ROUNDUP(n, v) ((n) - 1 + (v) - ((n) - 1) % (v))
 #define MAX_DIR_ENTS 128
@@ -45,6 +48,9 @@ uint32_t nblocks;
 char *diskmap, *diskpos;
 struct Super *super;
 uint32_t *bitmap;
+#if defined(ENABLE_JBD)
+Journal_t *jsuper;
+#endif
 
 void
 panic(const char *fmt, ...)
@@ -115,8 +121,20 @@ opendisk(const char *name)
 	strcpy(super->s_root.f_name, "/");
 
 	nbitblocks = (nblocks + BLKBITSIZE - 1) / BLKBITSIZE;
+	//fprintf(stdout, "%s: nbitblocks = %d\n", __func__, nbitblocks);
 	bitmap = alloc(nbitblocks);
 	memset(bitmap, 0xFF, nbitblocks * BLKSIZE);
+
+#if defined(ENABLE_JBD)
+	jsuper = alloc(BLKSIZE);
+	memset(jsuper, 0, BLKSIZE);
+	jsuper->j_magic = JBD_MAGIC;
+	jsuper->j_nactive = 0;
+	jsuper->j_first = 0;
+	for (r = 0; r < MAX_NTRANS; ++r) {
+		jsuper->j_trans[r].t_id = r;
+	}
+#endif
 }
 
 void
@@ -220,7 +238,8 @@ main(int argc, char **argv)
 {
 	int i;
 	char *s;
-	struct Dir root;
+	struct Dir root, d;
+	struct File *f;
 
 	assert(BLKSIZE % sizeof(struct File) == 0);
 
@@ -236,6 +255,11 @@ main(int argc, char **argv)
 	startdir(&super->s_root, &root);
 	for (i = 3; i < argc; i++)
 		writefile(&root, argv[i]);
+	f = diradd(&root, FTYPE_DIR, "tejas");
+	f = diradd(&root, FTYPE_DIR, "foodir");
+	startdir(f, &d);
+	f = diradd(&d, FTYPE_DIR, "bardir");
+	finishdir(&d);
 	finishdir(&root);
 
 	finishdisk();

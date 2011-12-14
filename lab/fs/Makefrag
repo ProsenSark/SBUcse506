@@ -3,6 +3,7 @@ OBJDIRS += fs
 
 FSOFILES := 		$(OBJDIR)/fs/ide.o \
 			$(OBJDIR)/fs/bc.o \
+			$(OBJDIR)/fs/jbd.o \
 			$(OBJDIR)/fs/fs.o \
 			$(OBJDIR)/fs/serv.o \
 			$(OBJDIR)/fs/test.o \
@@ -23,6 +24,9 @@ USERAPPS :=		$(USERAPPS) \
 			$(OBJDIR)/user/init \
 			$(OBJDIR)/user/ls \
 			$(OBJDIR)/user/lsfd \
+			$(OBJDIR)/user/mkdir \
+			$(OBJDIR)/user/rm \
+			$(OBJDIR)/user/truncate \
 			$(OBJDIR)/user/num \
 			$(OBJDIR)/user/forktree \
 			$(OBJDIR)/user/primes \
@@ -61,7 +65,7 @@ $(OBJDIR)/fs/fs: $(FSOFILES) $(OBJDIR)/lib/entry.o $(OBJDIR)/lib/libjos.a user/u
 $(OBJDIR)/fs/fsformat: fs/fsformat.c
 	@echo + mk $(OBJDIR)/fs/fsformat
 	$(V)mkdir -p $(@D)
-	$(V)gcc $(USER_CFLAGS) -o $(OBJDIR)/fs/fsformat fs/fsformat.c
+	$(V)gcc $(HOST_CFLAGS) -o $(OBJDIR)/fs/fsformat fs/fsformat.c
 
 $(OBJDIR)/fs/clean-fs.img: $(OBJDIR)/fs/fsformat $(FSIMGFILES)
 	@echo + mk $(OBJDIR)/fs/clean-fs.img

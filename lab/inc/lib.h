@@ -7,6 +7,9 @@
 #ifndef JOS_INC_LIB_H
 #define JOS_INC_LIB_H 1
 
+//#if (defined(JOS_KERNEL) || defined(JOS_USER))
+#if defined(JOS_USER)
+
 #include <inc/types.h>
 #include <inc/stdio.h>
 #include <inc/stdarg.h>
@@ -51,6 +54,7 @@ static envid_t sys_exofork(void);
 int	sys_env_set_status(envid_t env, int status);
 int	sys_env_set_trapframe(envid_t env, struct Trapframe *tf);
 int	sys_env_set_pgfault_upcall(envid_t env, void *upcall);
+int sys_env_set_transaction(envid_t envid, void *trans);
 int	sys_page_alloc(envid_t env, void *pg, int perm);
 int	sys_page_map(envid_t src_env, void *src_pg,
 		     envid_t dst_env, void *dst_pg, int perm);
@@ -105,6 +109,9 @@ int	sync(void);
 // pageref.c
 int	pageref(void *addr);
 
+// sleep.c
+void sleep(int sec);
+
 // sockets.c
 int     accept(int s, struct sockaddr *addr, socklen_t *addrlen);
 int     bind(int s, struct sockaddr *name, socklen_t namelen);
@@ -151,5 +158,7 @@ void	wait(envid_t env);
 #define	O_TRUNC		0x0200		/* truncate to zero length */
 #define	O_EXCL		0x0400		/* error if already exists */
 #define O_MKDIR		0x0800		/* create directory, not regular file */
+
+#endif
 
 #endif	// !JOS_INC_LIB_H

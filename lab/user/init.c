@@ -42,6 +42,9 @@ umain(int argc, char **argv)
 		cprintf(" '%s'", argv[i]);
 	cprintf("\n");
 
+#if ((defined LAB) && (LAB == 5))
+	cprintf("init: exiting\n");
+#else
 	cprintf("init: running sh\n");
 
 	// being run directly from kernel, so no file descriptors open yet
@@ -61,4 +64,5 @@ umain(int argc, char **argv)
 		}
 		wait(r);
 	}
+#endif
 }

@@ -97,10 +97,49 @@ flush_block(void *addr)
 	if (r < 0) {
 		panic("flush_block: ide_write FAILED: %e", r);
 	}
+	// Clear dirty bit
 	r = sys_page_map(0, src_va, 0, src_va, PTE_USER);
 	if (r < 0) {
 		panic("flush_block: sys_page_map FAILED: %e", r);
 	}
+}
+
+void
+flush_sector(void *addr)
+{
+	uint32_t secno = ((uint32_t)addr - DISKMAP) / SECTSIZE;
+	int r;
+	void *src_va;
+
+	if (addr < (void*)DISKMAP || addr >= (void*)(DISKMAP + DISKSIZE)) {
+		panic("flush_sector of bad va %08x", addr);
+	}
+
+	if (!va_is_mapped(addr)) {
+		return;
+	}
+	if (!va_is_dirty(addr)) {
+		return;
+	}
+
+	src_va = (void *) (DISKMAP + secno * SECTSIZE);
+	/*
+	 * NOTE: The following is a single sector write to IDE disk, which is
+	 * presumed to be atomic enough such that even if power fails while the
+	 * write is in-progress, the disk hardware can gather enough power to
+	 * write out the sector fully, probably from capacitors, etc.
+	 */
+	r = ide_write(secno, src_va, 1);
+	if (r < 0) {
+		panic("flush_block: ide_write FAILED: %e", r);
+	}
+#if 0
+	// Clear dirty bit
+	r = sys_page_map(0, src_va, 0, src_va, PTE_USER);
+	if (r < 0) {
+		panic("flush_block: sys_page_map FAILED: %e", r);
+	}
+#endif
 }
 
 // Test that the block cache works, by smashing the superblock and

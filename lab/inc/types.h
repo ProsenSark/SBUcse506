@@ -77,4 +77,10 @@ typedef int32_t off_t;
 	(__v >= 0x1) ? (__v + 1) : ~(___v << (sizeof(_v)*8 - 1)); \
 })
 
+static inline int
+is_power_of_two(uint32_t n)
+{
+	return ((n != 0) && !(n & (n - 1)));
+}
+
 #endif /* !JOS_INC_TYPES_H */

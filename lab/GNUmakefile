@@ -84,6 +84,7 @@ CFLAGS += -Wall -Wno-format -Wno-unused -Werror -gstabs -m32
 #CFLAGS += -DNO_LAB3A_CH_OPT=1
 CFLAGS += -DNO_FAST_SYSCALL=1
 #CFLAGS += -DLAB4A_SCHED_PRI=1
+CFLAGS += -DENABLE_JBD
 
 CFLAGS += -I$(TOP)/net/lwip/include \
 	  -I$(TOP)/net/lwip/include/ipv4 \
@@ -119,6 +120,7 @@ all:
 
 KERN_CFLAGS := $(CFLAGS) -DJOS_KERNEL -gstabs
 USER_CFLAGS := $(CFLAGS) -DJOS_USER -gstabs
+HOST_CFLAGS := $(CFLAGS) -gstabs
 
 
 
@@ -202,6 +204,14 @@ handin: realclean
 
 tarball: realclean
 	tar cf - `find . -type f | grep -v '^\.*$$' | grep -v '/CVS/' | grep -v '/\.svn/' | grep -v '/\.git/' | grep -v 'lab[0-9].*\.tar\.gz'` | gzip > lab$(LAB)-handin.tar.gz
+
+crash-kernel:
+	$(V)$(RM) $(OBJDIR)/fs/serv.o $(OBJDIR)/fs/fs.o
+	$(V)$(MAKE) "DEFS=-DTEST_CRASH" $(OBJDIR)/kern/kernel.img
+
+sane-kernel:
+	$(V)$(RM) $(OBJDIR)/fs/serv.o $(OBJDIR)/fs/fs.o
+	$(V)$(MAKE) $(OBJDIR)/kern/kernel.img
 
 # For test runs
 prep-%:

@@ -157,6 +157,12 @@ sys_env_set_pgfault_upcall(envid_t envid, void *upcall)
 }
 
 int
+sys_env_set_transaction(envid_t envid, void *trans)
+{
+	return syscall(SYS_env_set_transaction, 1, envid, (uint32_t) trans, 0, 0, 0);
+}
+
+int
 sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, int perm)
 {
 	return syscall(SYS_ipc_try_send, 0, envid, value, (uint32_t) srcva, perm, 0);

@@ -1,4 +1,5 @@
 #include <inc/lib.h>
+#include <inc/pincl.h>
 
 int flag[256];
 
@@ -12,7 +13,10 @@ ls(const char *path, const char *prefix)
 	struct Stat st;
 
 	if ((r = stat(path, &st)) < 0)
-		panic("stat %s: %e", path, r);
+	{
+		clog("stat %s: %e", path, r);
+		exit();
+	}
 	if (st.st_isdir && !flag['d'])
 		lsdir(path, prefix);
 	else
@@ -25,15 +29,27 @@ lsdir(const char *path, const char *prefix)
 	int fd, n;
 	struct File f;
 
+	//clog("wp1");
 	if ((fd = open(path, O_RDONLY)) < 0)
-		panic("open %s: %e", path, fd);
+	{
+		clog("open %s: %e", path, fd);
+		exit();
+	}
 	while ((n = readn(fd, &f, sizeof f)) == sizeof f)
+	{
 		if (f.f_name[0])
 			ls1(prefix, f.f_type==FTYPE_DIR, f.f_size, f.f_name);
+	}
 	if (n > 0)
-		panic("short read in directory %s", path);
+	{
+		clog("short read in directory %s", path);
+		exit();
+	}
 	if (n < 0)
-		panic("error reading directory %s: %e", path, n);
+	{
+		clog("error reading directory %s: %e", path, n);
+		exit();
+	}
 }
 
 void
@@ -41,6 +57,7 @@ ls1(const char *prefix, bool isdir, off_t size, const char *name)
 {
 	char *sep;
 
+	//clog("wp1");
 	if(flag['l'])
 		printf("%11d %c ", size, isdir ? 'd' : '-');
 	if(prefix) {

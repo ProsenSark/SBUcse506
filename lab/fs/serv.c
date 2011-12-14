@@ -9,9 +9,18 @@
 #include <inc/pincl.h>
 
 #include "fs.h"
+#if defined(ENABLE_JBD)
+#include "jbd.h"
+#endif
 
 
 #define debug 0
+#define profile 0
+#if defined(TEST_CRASH)
+# define test_crash 1
+#else
+# define test_crash 0
+#endif
 
 // The file system server maintains three structures
 // for each open file.
@@ -36,16 +45,26 @@ struct OpenFile {
 	struct File *o_file;	// mapped descriptor for open file
 	int o_mode;		// open mode
 	struct Fd *o_fd;	// Fd page
+	// FIXME: optimize to remove the following
+#if defined(ENABLE_JBD)
+	char o_fpath[MAXPATHLEN];	// full file path
+#endif
 };
 
 // Max number of open files in the file system at once
 #define MAXOPEN		1024
+#define HVA			0xA0000000
 #define FILEVA		0xD0000000
 
 // initialize to force into data section
 struct OpenFile opentab[MAXOPEN] = {
 	{ 0, 0, 1, 0 }
 };
+
+#if defined(ENABLE_JBD)
+//static Handle_t *hndl = (Handle_t*) HVA;
+static Handle_t hndl;
+#endif
 
 // Virtual address at which to receive page mappings containing client requests.
 union Fsipc *fsreq = (union Fsipc *)0x0ffff000;
@@ -79,6 +98,9 @@ openfile_alloc(struct OpenFile **o)
 			opentab[i].o_fileid += MAXOPEN;
 			*o = &opentab[i];
 			memset(opentab[i].o_fd, 0, PGSIZE);
+#if defined(ENABLE_JBD)
+			memset(opentab[i].o_fpath, 0, MAXPATHLEN);
+#endif
 			return (*o)->o_fileid;
 		}
 	}
@@ -94,6 +116,17 @@ openfile_lookup(envid_t envid, uint32_t fileid, struct OpenFile **po)
 	o = &opentab[fileid % MAXOPEN];
 	if (pageref(o->o_fd) == 1 || o->o_fileid != fileid)
 		return -E_INVAL;
+
+#if defined(ENABLE_JBD)
+	// NOTE: This kludge is to handle cases where a forked child needs an open
+	// transaction as well, because serve_flush will be called for the child
+	// as well. Of course, this sort of implies start_transaction should be
+	// advisory, ignoring if an open transaction for 'envid' already exists.
+	if (o->o_mode & (O_WRONLY | O_RDWR | O_CREAT | O_TRUNC)) {
+		start_transaction(envid);
+	}
+#endif
+
 	*po = o;
 	return 0;
 }
@@ -110,6 +143,9 @@ serve_open(envid_t envid, struct Fsreq_open *req,
 	int fileid;
 	int r;
 	struct OpenFile *o;
+	uint32_t filetype;
+
+	PROFILE_START();
 
 	if (debug)
 		cprintf("serve_open %08x %s 0x%x\n", envid, req->req_path, req->req_omode);
@@ -128,7 +164,22 @@ serve_open(envid_t envid, struct Fsreq_open *req,
 
 	// Open the file
 	if (req->req_omode & O_CREAT) {
-		if ((r = file_create(path, &f)) < 0) {
+		filetype = FTYPE_REG;
+		if (req->req_omode & O_MKDIR) {
+			filetype = FTYPE_DIR;
+		}
+
+#if defined(ENABLE_JBD)
+		start_transaction(envid);
+
+		memset(&hndl, 0, sizeof(hndl));
+		hndl.h_hdr.h_oper = JBD_CREAT;
+		memmove(hndl.h_hdr.h_filename, path, MAXPATHLEN);
+		hndl.h_params.creat.p_filetype = filetype;
+		add_handle_to_transaction(envid, &hndl);
+#endif
+
+		if ((r = file_create(path, &f, filetype, test_crash)) < 0) {
 			if (!(req->req_omode & O_EXCL) && r == -E_FILE_EXISTS)
 				goto try_open;
 			if (debug)
@@ -136,6 +187,13 @@ serve_open(envid_t envid, struct Fsreq_open *req,
 			return r;
 		}
 	} else {
+
+#if defined(ENABLE_JBD)
+		if (req->req_omode & (O_WRONLY | O_RDWR | O_TRUNC)) {
+			start_transaction(envid);
+		}
+#endif
+
 try_open:
 		if ((r = file_open(path, &f)) < 0) {
 			if (debug)
@@ -146,6 +204,15 @@ try_open:
 
 	// Truncate
 	if (req->req_omode & O_TRUNC) {
+
+#if defined(ENABLE_JBD)
+		memset(&hndl, 0, sizeof(hndl));
+		hndl.h_hdr.h_oper = JBD_TRUNC;
+		memmove(hndl.h_hdr.h_filename, path, MAXPATHLEN);
+		hndl.h_params.trunc.p_off = 0;
+		add_handle_to_transaction(envid, &hndl);
+#endif
+
 		if ((r = file_set_size(f, 0)) < 0) {
 			if (debug)
 				cprintf("file_set_size failed: %e", r);
@@ -162,12 +229,19 @@ try_open:
 	o->o_fd->fd_dev_id = devfile.dev_id;
 	o->o_mode = req->req_omode;
 
+#if defined(ENABLE_JBD)
+	memmove(o->o_fpath, path, MAXPATHLEN);
+#endif
+
 	if (debug)
 		cprintf("sending success, page %08x\n", (uintptr_t) o->o_fd);
 
 	// Share the FD page with the caller
 	*pg_store = o->o_fd;
 	*perm_store = PTE_P|PTE_U|PTE_W|PTE_SHARE;
+
+	PROFILE_END();
+
 	return 0;
 }
 
@@ -178,6 +252,8 @@ serve_set_size(envid_t envid, struct Fsreq_set_size *req)
 {
 	struct OpenFile *o;
 	int r;
+
+	PROFILE_START();
 
 	if (debug)
 		cprintf("serve_set_size %08x %08x %08x\n", envid, req->req_fileid, req->req_size);
@@ -190,9 +266,21 @@ serve_set_size(envid_t envid, struct Fsreq_set_size *req)
 	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
 		return r;
 
+#if defined(ENABLE_JBD)
+	memset(&hndl, 0, sizeof(hndl));
+	hndl.h_hdr.h_oper = JBD_TRUNC;
+	memmove(hndl.h_hdr.h_filename, o->o_fpath, MAXPATHLEN);
+	hndl.h_params.trunc.p_off = req->req_size;
+	add_handle_to_transaction(envid, &hndl);
+#endif
+
 	// Second, call the relevant file system function (from fs/fs.c).
 	// On failure, return the error code to the client.
-	return file_set_size(o->o_file, req->req_size);
+	r = file_set_size(o->o_file, req->req_size);
+
+	PROFILE_END();
+
+	return r;
 }
 
 // Read at most ipc->read.req_n bytes from the current seek position
@@ -250,6 +338,8 @@ serve_write(envid_t envid, struct Fsreq_write *req)
 	int r;
 	size_t count;
 
+	PROFILE_START();
+
 	if (debug)
 		cprintf("serve_write %08x %08x %08x\n", envid, req->req_fileid, req->req_n);
 
@@ -262,11 +352,37 @@ serve_write(envid_t envid, struct Fsreq_write *req)
 	}
 	assert(o != NULL);
 	assert(o->o_fd != NULL);
+	assert(o->o_file != NULL);
+
+#if defined(ENABLE_JBD)
+	//clog("wp1: envid = %x, %s, %u, %u", envid, o->o_fpath,
+	//		o->o_fd->fd_offset, count);
+	// FIXME: split into multiple handles for bigger 'count'
+	if (count > sizeof(hndl.h_params.write.p_data)) {
+		panic("serve_write: cannot accomodate %u bytes in a single handle",
+				count);
+	}
+
+	memset(&hndl, 0, sizeof(hndl));
+	hndl.h_hdr.h_oper = JBD_WRITE;
+	memmove(hndl.h_hdr.h_filename, o->o_fpath, MAXPATHLEN);
+	hndl.h_params.write.p_off = o->o_fd->fd_offset;
+	hndl.h_params.write.p_dsize = count;
+	memmove(hndl.h_params.write.p_data, req->req_buf, count);
+	add_handle_to_transaction(envid, &hndl);
+#else
+	//clog("wp1: envid = %x, %s, %u, %u", envid, o->o_file->f_name,
+	//		o->o_fd->fd_offset, count);
+#endif
+
 	r = file_write(o->o_file, req->req_buf, count, o->o_fd->fd_offset);
 	if (r < 0) {
 		return r;
 	}
 	o->o_fd->fd_offset += r;
+
+	PROFILE_END();
+
 	return r;
 }
 
@@ -297,14 +413,59 @@ int
 serve_flush(envid_t envid, struct Fsreq_flush *req)
 {
 	struct OpenFile *o;
+	int fd_ref;
 	int r;
+	bool crash = 0;
+
+	PROFILE_START();
 
 	if (debug)
 		cprintf("serve_flush %08x %08x\n", envid, req->req_fileid);
 
 	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
 		return r;
-	file_flush(o->o_file);
+
+	fd_ref = pageref(o->o_fd);
+	assert(fd_ref >= 2);
+
+	//clog("wp1: envid = %x", envid);
+#if 0
+	// NOTE: Flush to disk only if this is the last reference
+	//	On 2nd thoughts, this may NOT be desirable for a single writer &
+	//	multiple readers
+	if (fd_ref > 2) {
+		return 0;
+	}
+#endif
+
+	if (o->o_mode & (O_WRONLY | O_RDWR | O_CREAT | O_TRUNC)) {
+#if defined(ENABLE_JBD)
+		commit_transaction(envid, 0);
+#endif
+#if defined(TEST_CRASH)
+		if (test_crash) {
+			crash = 1;
+			clog("%x: %u, %s, fd_ref = %d", envid, o->o_file->f_type,
+#if defined(ENABLE_JBD)
+					o->o_fpath,
+#else
+					o->o_file->f_name,
+#endif
+					fd_ref);
+		}
+#endif
+	}
+
+	file_flush(o->o_file, crash);
+
+#if defined(ENABLE_JBD)
+	if (o->o_mode & (O_WRONLY | O_RDWR | O_CREAT | O_TRUNC)) {
+		end_transaction(envid);
+	}
+#endif
+
+	PROFILE_END();
+
 	return 0;
 }
 
@@ -314,6 +475,8 @@ serve_remove(envid_t envid, struct Fsreq_remove *req)
 {
 	char path[MAXPATHLEN];
 	int r;
+
+	PROFILE_START();
 
 	if (debug)
 		cprintf("serve_remove %08x %s\n", envid, req->req_path);
@@ -325,8 +488,27 @@ serve_remove(envid_t envid, struct Fsreq_remove *req)
 	memmove(path, req->req_path, MAXPATHLEN);
 	path[MAXPATHLEN-1] = 0;
 
+#if defined(ENABLE_JBD)
+	start_transaction(envid);
+
+	memset(&hndl, 0, sizeof(hndl));
+	hndl.h_hdr.h_oper = JBD_DELET;
+	memmove(hndl.h_hdr.h_filename, path, MAXPATHLEN);
+	add_handle_to_transaction(envid, &hndl);
+
+	commit_transaction(envid, 0);
+#endif
+
 	// Delete the specified file
-	return file_remove(path);
+	r = file_remove(path, test_crash);
+
+#if defined(ENABLE_JBD)
+	end_transaction(envid);
+#endif
+
+	PROFILE_END();
+
+	return r;
 }
 
 // Sync the file system.
@@ -398,9 +580,13 @@ umain(void)
 	outw(0x8A00, 0x8A00);
 	cprintf("FS can do I/O\n");
 
+#if defined(ENABLE_JBD)
+	dclog(debug, "A single handle can accomodate max %u bytes",
+			sizeof(hndl.h_params.write.p_data));
+#endif
 	serve_init();
 	fs_init();
-	fs_test();
+	//fs_test();
 
 	serve();
 }

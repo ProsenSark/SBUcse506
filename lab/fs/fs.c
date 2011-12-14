@@ -1,7 +1,16 @@
 #include <inc/string.h>
+#include <inc/lib.h>
 #include <inc/pincl.h>
 
 #include "fs.h"
+#if defined(ENABLE_JBD)
+#include "jbd.h"
+#endif
+
+#define CRASH_SLEEP	3		// In secs
+
+struct Super *super;		// superblock
+uint32_t *bitmap;			// bitmap blocks mapped in memory
 
 // --------------------------------------------------------------
 // Super block
@@ -44,6 +53,15 @@ free_block(uint32_t blockno)
 	if (blockno == 0)
 		panic("attempt to free zero block");
 	bitmap[blockno/32] |= 1<<(blockno%32);
+	flush_block(bitmap);
+}
+
+void
+occupy_block(uint32_t blockno)
+{
+	assert(block_is_free(blockno));
+	bitmap[blockno / 32] ^= 1 << (blockno % 32);
+	flush_block(bitmap);
 }
 
 // Search the bitmap for a free block and allocate it.  When you
@@ -55,7 +73,7 @@ free_block(uint32_t blockno)
 //
 // Hint: use free_block as an example for manipulating the bitmap.
 int
-alloc_block(void)
+alloc_block(bool occupy)
 {
 	// The bitmap consists of one or more blocks.  A single bitmap block
 	// contains the in-use bits for BLKBITSIZE blocks.  There are
@@ -68,8 +86,9 @@ alloc_block(void)
 	assert(super != NULL);
 	for (blockno = 1; blockno < super->s_nblocks; ++blockno) {
 		if (block_is_free(blockno)) {
-			bitmap[blockno / 32] ^= 1 << (blockno % 32);
-			flush_block(bitmap);
+			if (occupy) {
+				occupy_block(blockno);
+			}
 			return blockno;
 		}
 	}
@@ -92,6 +111,7 @@ check_bitmap(void)
 	// Make sure the reserved and root blocks are marked in-use.
 	assert(!block_is_free(0));
 	assert(!block_is_free(1));
+	assert(!block_is_free(3));
 
 	cprintf("bitmap is good\n");
 }
@@ -118,9 +138,27 @@ fs_init(void)
 	super = diskaddr(1);
 	// Set "bitmap" to the beginning of the first bitmap block.
 	bitmap = diskaddr(2);
+#if defined(ENABLE_JBD)
+	// Set "jsuper"
+	jsuper = diskaddr(3);
+	//atbmap = diskaddr(4);
+
+	//clog("wp1: sizeof(Journal_t) = %u", sizeof(Journal_t));
+	//clog("wp1: sizeof(Transaction_t) = %u", sizeof(Transaction_t));
+	//clog("wp1: sizeof(Handle_t) = %u", sizeof(Handle_t));
+	assert( sizeof(Journal_t) == BLKSIZE );
+	assert( is_power_of_two(sizeof(Transaction_t)) );
+	assert( sizeof(Handle_t) == BLKSIZE );
+	clog("journal magic = %x", jsuper->j_magic);
+#endif
 
 	check_super();
 	check_bitmap();
+#if defined(ENABLE_JBD)
+	check_journal();
+
+	journal_init();
+#endif
 }
 
 // Find the disk block number slot for the 'filebno'th block in file 'f'.
@@ -162,10 +200,11 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 		if (!alloc) {
 			return -E_NOT_FOUND;
 		}
-		rc = alloc_block();
+		rc = alloc_block(1);
 		if (rc < 0) {
 			return rc;
 		}
+		memset(diskaddr(rc), 0, BLKSIZE);
 		f->f_indirect = rc;
 	}
 	else {
@@ -204,10 +243,11 @@ file_get_block(struct File *f, uint32_t filebno, char **blk)
 	}
 
 	if (*pdiskbno == 0) {
-		rc = alloc_block();
+		rc = alloc_block(1);
 		if (rc < 0) {
 			return rc;
 		}
+		memset(diskaddr(rc), 0, BLKSIZE);
 		*pdiskbno = rc;
 	}
 	else {
@@ -350,12 +390,15 @@ walk_path(const char *path, struct File **pdir, struct File **pf, char *lastelem
 // Create "path".  On success set *pf to point at the file and return 0.
 // On error return < 0.
 int
-file_create(const char *path, struct File **pf)
+file_create(const char *path, struct File **pf, uint32_t filetype, bool crash)
 {
 	char name[MAXNAMELEN];
 	int r;
 	struct File *dir, *f;
 
+	if ((filetype != FTYPE_REG) && (filetype != FTYPE_DIR)) {
+		return -E_INVAL;
+	}
 	if ((r = walk_path(path, &dir, &f, name)) == 0)
 		return -E_FILE_EXISTS;
 	if (r != -E_NOT_FOUND || dir == 0)
@@ -363,8 +406,16 @@ file_create(const char *path, struct File **pf)
 	if (dir_alloc_file(dir, &f) < 0)
 		return r;
 	strcpy(f->f_name, name);
+	f->f_type = filetype;
 	*pf = f;
-	file_flush(dir);
+
+#if defined(TEST_CRASH)
+	if (crash) {
+		clog("%u, %s", filetype, path);
+	}
+#endif
+
+	file_flush(dir, crash);
 	return 0;
 }
 
@@ -479,6 +530,7 @@ file_truncate_blocks(struct File *f, off_t newsize)
 int
 file_set_size(struct File *f, off_t newsize)
 {
+	//clog("newsize = %d", newsize);
 	if (f->f_size > newsize)
 		file_truncate_blocks(f, newsize);
 	f->f_size = newsize;
@@ -491,25 +543,48 @@ file_set_size(struct File *f, off_t newsize)
 // Translate the file block number into a disk block number
 // and then check whether that disk block is dirty.  If so, write it out.
 void
-file_flush(struct File *f)
+file_flush(struct File *f, bool crash)
 {
 	int i;
 	uint32_t *pdiskbno;
 
+#if defined(TEST_CRASH)
+	if (crash) {
+		clog("sleeping for %d secs BEFORE flush_block() of file blocks, "
+				"hit Ctrl-a x to simulate a CRASH!", CRASH_SLEEP);
+		sleep(CRASH_SLEEP);
+	}
+#endif
 	for (i = 0; i < (f->f_size + BLKSIZE - 1) / BLKSIZE; i++) {
 		if (file_block_walk(f, i, &pdiskbno, 0) < 0 ||
 		    pdiskbno == NULL || *pdiskbno == 0)
 			continue;
 		flush_block(diskaddr(*pdiskbno));
 	}
+
+#if defined(TEST_CRASH)
+	if (crash) {
+		clog("sleeping for %d secs BEFORE flush_block() of File struct, "
+				"hit Ctrl-a x to simulate a CRASH!", CRASH_SLEEP);
+		sleep(CRASH_SLEEP);
+	}
+#endif
 	flush_block(f);
+
+#if defined(TEST_CRASH)
+	if (crash) {
+		clog("sleeping for %d secs BEFORE flush_block() of file indirect block, "
+				"hit Ctrl-a x to simulate a CRASH!", CRASH_SLEEP);
+		sleep(CRASH_SLEEP);
+	}
+#endif
 	if (f->f_indirect)
 		flush_block(diskaddr(f->f_indirect));
 }
 
 // Remove a file by truncating it and then zeroing the name.
 int
-file_remove(const char *path)
+file_remove(const char *path, bool crash)
 {
 	int r;
 	struct File *f;
@@ -520,6 +595,14 @@ file_remove(const char *path)
 	file_truncate_blocks(f, 0);
 	f->f_name[0] = '\0';
 	f->f_size = 0;
+
+#if defined(TEST_CRASH)
+	if (crash) {
+		clog("sleeping for %d secs BEFORE flush_block() of File struct, "
+				"hit Ctrl-a x to simulate a CRASH!", CRASH_SLEEP);
+		sleep(CRASH_SLEEP);
+	}
+#endif
 	flush_block(f);
 
 	return 0;

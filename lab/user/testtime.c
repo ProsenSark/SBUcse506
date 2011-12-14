@@ -1,6 +1,7 @@
 #include <inc/lib.h>
 #include <inc/x86.h>
 
+#if 0
 void
 sleep(int sec)
 {
@@ -15,6 +16,7 @@ sleep(int sec)
 	while (sys_time_msec() < end)
 		sys_yield();
 }
+#endif
 
 void
 umain(int argc, char **argv)

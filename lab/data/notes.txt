@@ -1,0 +1,11 @@
+
+$ git clone ssh://rakumar@scm.cs.stonybrook.edu:130/home/SCM/cse506git-f11/hw-rakumar lab
+$ cd lab
+$ git checkout -b lab7 origin/lab7
+$ git fetch -t
+$ git merge project-p3
+
+$ git clone ssh://rakumar@scm.cs.stonybrook.edu:130/home/SCM/cse506git-f11/hw-rakumar lab
+$ cd lab
+$ git checkout project-p3
+

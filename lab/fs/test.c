@@ -20,7 +20,7 @@ fs_test(void)
 	bits = (uint32_t*) PGSIZE;
 	memmove(bits, bitmap, PGSIZE);
 	// allocate block
-	if ((r = alloc_block()) < 0)
+	if ((r = alloc_block(1)) < 0)
 		panic("alloc_block: %e", r);
 	// check that block was free
 	assert(bits[r/32] & (1 << (r%32)));
@@ -44,7 +44,7 @@ fs_test(void)
 
 	*(volatile char*)blk = *(volatile char*)blk;
 	assert((vpt[VPN(blk)] & PTE_D));
-	file_flush(f);
+	file_flush(f, 0);
 	assert(!(vpt[VPN(blk)] & PTE_D));
 	cprintf("file_flush is good\n");
 
@@ -61,7 +61,7 @@ fs_test(void)
 		panic("file_get_block 2: %e", r);
 	strcpy(blk, msg);
 	assert((vpt[VPN(blk)] & PTE_D));
-	file_flush(f);
+	file_flush(f, 0);
 	assert(!(vpt[VPN(blk)] & PTE_D));
 	assert(!(vpt[VPN(f)] & PTE_D));
 	cprintf("file rewrite is good\n");

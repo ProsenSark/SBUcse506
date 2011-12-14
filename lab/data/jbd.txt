@@ -1,0 +1,175 @@
+icode startup
+icode: open /motd
+FS is running
+FS can do I/O
+Device 1 presence: 1
+block cache is good
+fs/fs.c:150: fs_init: journal magic = 4a424421
+superblock is good
+bitmap is good
+journal superblock is good
+ns: 52:54:00:12:34:56 bound to static IP 10.0.2.15
+NS: TCP/IP initialized.
+opened socket
+trying to bind
+bound
+fs/serv.c:239: serve_open: PROFILE: time taken = 0 msecs
+icode: read /motd
+This is /motd, the message of the day.
+
+Welcome to the JOS kernel, now with a file system!
+
+icode: close /motd
+Waiting for http connections...
+fs/serv.c:441: serve_flush: PROFILE: time taken = 10 msecs
+icode: spawn /init
+fs/serv.c:239: serve_open: PROFILE: time taken = 0 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 190 msecs
+icode: exiting
+init: running
+init: data seems okay
+init: bss seems okay
+init: args: 'init' 'initarg1' 'initarg2'
+init: running sh
+init: starting sh
+fs/serv.c:239: serve_open: PROFILE: time taken = 0 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 80 msecs
+$
+=== TOTAL = 280 ms
+
+
+$ cat lorem
+fs/serv.c:239: serve_open: PROFILE: time taken = 0 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 70 msecs
+fs/serv.c:239: serve_open: PROFILE: time taken = 0 msecs
+...
+fs/serv.c:441: serve_flush: PROFILE: time taken = 10 msecs
+$
+=== TOTAL = 80 ms
+
+
+$ cat lorem
+fs/serv.c:239: serve_open: PROFILE: time taken = 0 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 0 msecs
+fs/serv.c:239: serve_open: PROFILE: time taken = 0 msecs
+...
+fs/serv.c:441: serve_flush: PROFILE: time taken = 0 msecs
+$
+=== TOTAL = 0 ms
+
+
+$ echo
+fs/serv.c:239: serve_open: PROFILE: time taken = 0 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 60 msecs
+
+$
+=== TOTAL = 60 ms
+
+
+$ echo This is JOS. If you like it, please send donations to /dev/null. Thanks_and_Regards, Prosenjit_Sarkar-psarkar@cs.stonybrook.edu, Rakesh_Kumar-rkumar@cs.stonybrook.edu > 1.txt
+fs/serv.c:239: serve_open: PROFILE: time taken = 10 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 20 msecs
+fs/serv.c:239: serve_open: PROFILE: time taken = 0 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 0 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 0 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 10 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 10 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 0 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 0 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 10 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 0 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 0 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 10 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 0 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 0 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 10 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 0 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 0 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 10 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 0 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 0 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 0 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 0 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 0 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 0 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 0 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 10 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 0 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 0 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 10 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 0 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 0 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 10 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 0 msecs
+fs/serv.c:380: serve_write: PROFILE: time taken = 10 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 10 msecs
+$
+=== TOTAL = 140 ms
+
+
+$ rm
+fs/serv.c:239: serve_open: PROFILE: time taken = 0 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 60 msecs
+usage: rm [-r] [file/directory...]
+$
+=== TOTAL = 60 ms
+
+
+$ rm 1.txt
+fs/serv.c:239: serve_open: PROFILE: time taken = 0 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 0 msecs
+fs/serv.c:239: serve_open: PROFILE: time taken = 0 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 0 msecs
+fs/serv.c:483: serve_remove: PROFILE: time taken = 30 msecs
+$
+=== TOTAL = 30 ms
+
+
+$ mkdir
+fs/serv.c:239: serve_open: PROFILE: time taken = 0 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 70 msecs
+usage: mkdir [-p] [directory...]
+$
+=== TOTAL = 70 ms
+
+
+$ mkdir -p test1/test2/test3/test4/test5
+fs/serv.c:239: serve_open: PROFILE: time taken = 0 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 0 msecs
+fs/serv.c:239: serve_open: PROFILE: time taken = 10 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 20 msecs
+fs/serv.c:239: serve_open: PROFILE: time taken = 10 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 20 msecs
+fs/serv.c:239: serve_open: PROFILE: time taken = 10 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 20 msecs
+fs/serv.c:239: serve_open: PROFILE: time taken = 10 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 20 msecs
+fs/serv.c:239: serve_open: PROFILE: time taken = 20 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 10 msecs
+$
+=== TOTAL = 150 ms
+
+
+$ rm -r test1
+fs/serv.c:239: serve_open: PROFILE: time taken = 0 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 0 msecs
+fs/serv.c:239: serve_open: PROFILE: time taken = 0 msecs
+fs/serv.c:239: serve_open: PROFILE: time taken = 0 msecs
+fs/serv.c:239: serve_open: PROFILE: time taken = 0 msecs
+fs/serv.c:239: serve_open: PROFILE: time taken = 0 msecs
+fs/serv.c:239: serve_open: PROFILE: time taken = 0 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 0 msecs
+fs/serv.c:483: serve_remove: PROFILE: time taken = 20 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 0 msecs
+fs/serv.c:483: serve_remove: PROFILE: time taken = 30 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 0 msecs
+fs/serv.c:483: serve_remove: PROFILE: time taken = 30 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 0 msecs
+fs/serv.c:483: serve_remove: PROFILE: time taken = 30 msecs
+fs/serv.c:441: serve_flush: PROFILE: time taken = 0 msecs
+fs/serv.c:483: serve_remove: PROFILE: time taken = 30 msecs
+$
+=== TOTAL = 140 ms
+
+
+

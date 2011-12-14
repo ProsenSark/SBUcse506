@@ -207,6 +207,9 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	// Also clear the IPC receiving flag.
 	e->env_ipc_recving = 0;
 
+	// Initialize journal transaction reference to NULL
+	e->env_trans = NULL;
+
 	// If this is the file server (e == &envs[1]) give it I/O privileges.
 	// LAB 5: Your code here.
 	if (e == &envs[1]) {

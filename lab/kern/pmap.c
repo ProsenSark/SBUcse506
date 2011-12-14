@@ -92,12 +92,6 @@ static void check_page_alloc();
 static void page_check(void);
 static void boot_map_segment(pde_t *pgdir, uintptr_t la, size_t size, physaddr_t pa, int perm);
 
-static int
-is_power_of_two(uint32_t n)
-{
-	return ((n != 0) && !(n & (n - 1)));
-}
-
 //
 // A simple physical memory allocator, used only a few times
 // in the process of setting up the virtual memory system.
